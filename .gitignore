@@ -11,3 +11,12 @@ dist/
 
 # OS
 .DS_Store
+# ChromaDB local database
+backend/chroma_db/
+
+# Test files
+backend/test_agent.py
+backend/test_day4.py
+
+# Sample PDFs
+*.pdf
