@@ -4,7 +4,7 @@ Reads a PDF, segments it into named sections, prints results to console.
 """
 from ner import extract_legal_entities
 from classifier import classify_clause, assign_risk
-from google import genai
+
 import os
 import json
 from dotenv import load_dotenv
@@ -16,9 +16,6 @@ from vector_store import compare_all_sections, seed_templates
 from suggester import generate_suggestion
 
 load_dotenv()
-
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-print("API KEY LOADED:", os.getenv("GEMINI_API_KEY")[:5])
 
 
 # ─────────────────────────────────────────────
@@ -76,6 +73,11 @@ def regex_segment(text: str) -> list[dict]:
 # ─────────────────────────────────────────────
 
 def llm_parse_structure(raw_sections: list[dict]) -> list[dict]:
+    import time
+    from groq import Groq
+
+    time.sleep(1)
+
     compact = []
     for i, s in enumerate(raw_sections):
         compact.append({
@@ -108,29 +110,40 @@ Sections:
 {json.dumps(compact, indent=2)}
 """
 
-    response = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=prompt
-    )
-
-    response_text = response.text.strip()
-
     try:
+        groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        chat = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2
+        )
+        response_text = chat.choices[0].message.content.strip()
+
+        # Strip markdown code fences if present
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
+        response_text = response_text.strip()
+
         classifications = json.loads(response_text)
+
+        enriched = []
+        for item in classifications:
+            idx = item["index"]
+            section = raw_sections[idx].copy()
+            section["canonical_name"] = item["canonical_name"]
+            section["confidence"] = item["confidence"]
+            enriched.append(section)
+
+        return enriched
+
     except json.JSONDecodeError:
-        print("⚠️ LLM returned invalid JSON:")
-        print(response_text)
+        print("⚠️ LLM returned invalid JSON, using regex sections as fallback")
         return raw_sections
-
-    enriched = []
-    for item in classifications:
-        idx = item["index"]
-        section = raw_sections[idx].copy()
-        section["canonical_name"] = item["canonical_name"]
-        section["confidence"] = item["confidence"]
-        enriched.append(section)
-
-    return enriched
+    except Exception as e:
+        print(f"⚠️ LLM call failed ({str(e)[:80]}), using regex sections as fallback")
+        return raw_sections
 
 
 # ─────────────────────────────────────────────
@@ -200,7 +213,8 @@ def run_pipeline(pdf_path: str) -> list[dict]:
     print(f"   Found {len(regex_sections)} candidate sections")
 
     print("\n🤖 Sending to LLM for canonical naming...")
-    enriched_sections = regex_sections
+    #enriched_sections = regex_sections
+    enriched_sections = llm_parse_structure(regex_sections)
 
     # STEP 1: NER + Classification
     for section in enriched_sections:
