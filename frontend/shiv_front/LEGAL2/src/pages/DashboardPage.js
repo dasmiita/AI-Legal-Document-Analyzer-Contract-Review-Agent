@@ -18,8 +18,8 @@ export default function DashboardPage({ analysisData }) {
       title: s.canonical_name || s.raw_heading,
       risk: s.risk ? s.risk.charAt(0).toUpperCase() + s.risk.slice(1) : 'Low',
       text: s.body,
-      explanation: s.redline?.plain_english_issue || '',
-      suggestion: s.redline?.suggested_replacement || '',
+      explanation: s.explanation || '',
+      suggestion: s.redline?.suggested_replacement || s.redline?.suggested_redline || '',
       entities: s.entities || {},
     }));
   }, [analysisData, isReal]);
@@ -29,63 +29,91 @@ export default function DashboardPage({ analysisData }) {
     const high = clauses.filter(c => c.risk === 'High').length;
     const medium = clauses.filter(c => c.risk === 'Medium').length;
     const low = clauses.filter(c => c.risk === 'Low').length;
-    return {
-      totalClauses: clauses.length,
-      highRisk: high,
-      mediumRisk: medium,
-      lowRisk: low,
-      aiSummary: analysisData.analysis,
-    };
+    return { totalClauses: clauses.length, highRisk: high, mediumRisk: medium, lowRisk: low, aiSummary: analysisData.analysis };
   }, [clauses, analysisData, isReal]);
+
+  const riskLevel = summary.highRisk > 0 ? 'high' : summary.mediumRisk > 0 ? 'medium' : 'low';
 
   return (
     <>
       <style>{`
-        .dash-wrap { padding: 24px 28px; max-width: 1440px; margin: 0 auto; animation: fadeUp 0.4s ease both; }
-        .dash-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; flex-wrap: wrap; gap: 12px; }
-        .dash-title { font-size: 1.15rem; font-weight: 800; color: #f2f2f2; letter-spacing: -0.5px; }
-        .dash-sub { font-size: 0.72rem; color: #333; margin-top: 3px; }
-        .dash-sub span { color: #444; }
+        .dash-wrap {
+          padding: 28px 32px; max-width: 1440px; margin: 0 auto;
+          animation: fadeUp 0.4s ease both;
+          background: var(--ink); min-height: calc(100vh - 58px);
+        }
+        .dash-topbar {
+          display: flex; justify-content: space-between; align-items: center;
+          margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+          padding-bottom: 20px; border-bottom: 1px solid var(--border);
+        }
+        .dash-breadcrumb {
+          font-family: 'DM Mono', monospace;
+          font-size: 0.62rem; color: var(--text-dim); margin-bottom: 6px;
+          letter-spacing: 0.1em; text-transform: uppercase;
+        }
+        .dash-breadcrumb span { color: var(--gold); }
+        .dash-title {
+          font-family: 'Playfair Display', serif;
+          font-size: 1.3rem; font-weight: 700; color: var(--text); letter-spacing: -0.3px;
+        }
+        .dash-sub {
+          font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;
+          font-family: 'DM Mono', monospace; letter-spacing: 0.03em;
+        }
         .dash-actions { display: flex; gap: 8px; align-items: center; }
-        .btn-ghost { padding: 8px 18px; border-radius: 9px; border: 1px solid #222; background: transparent; color: #555; font-size: 0.78rem; cursor: pointer; font-weight: 500; transition: all 0.18s; font-family: Inter, sans-serif; }
-        .btn-ghost:hover { border-color: #B8FF00; color: #B8FF00; }
-        .risk-badge { padding: 8px 14px; border-radius: 9px; background: rgba(255,77,77,0.08); border: 1px solid rgba(255,77,77,0.2); color: #ff4d4d; font-size: 0.75rem; font-weight: 700; }
-        .dash-grid { display: grid; grid-template-columns: 320px 1fr; gap: 18px; }
-        .section-label { font-size: 0.62rem; font-weight: 700; color: #2e2e2e; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 10px; }
+        .btn-ghost {
+          padding: 7px 16px; border-radius: 7px;
+          border: 1px solid var(--border2); background: transparent;
+          color: var(--text-muted); font-size: 0.78rem; cursor: pointer;
+          font-weight: 400; transition: all 0.15s; font-family: 'DM Sans', sans-serif;
+        }
+        .btn-ghost:hover { border-color: var(--gold-border); color: var(--gold); background: var(--gold-dim); }
+        .risk-pill {
+          font-family: 'DM Mono', monospace;
+          padding: 6px 14px; border-radius: 7px; font-size: 0.7rem; font-weight: 500;
+          letter-spacing: 0.06em;
+        }
+        .risk-pill.high   { background: var(--red-dim);    border: 1px solid var(--red-border);    color: var(--red); }
+        .risk-pill.medium { background: var(--yellow-dim); border: 1px solid var(--yellow-border); color: var(--yellow); }
+        .risk-pill.low    { background: var(--green-dim);  border: 1px solid var(--green-border);  color: var(--green); }
+        .dash-grid { display: grid; grid-template-columns: 300px 1fr; gap: 18px; }
+        .section-label {
+          font-family: 'DM Mono', monospace;
+          font-size: 0.62rem; font-weight: 500; color: var(--text-dim);
+          text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px;
+        }
         @media (max-width: 800px) { .dash-grid { grid-template-columns: 1fr; } }
       `}</style>
 
       <div className="dash-wrap">
-        {/* Top bar */}
         <div className="dash-topbar">
           <div>
-            <p style={{ fontSize: '0.65rem', color: '#2e2e2e', marginBottom: 4, letterSpacing: '0.5px' }}>
-              UPLOAD &nbsp;/&nbsp; <span style={{ color: '#B8FF00' }}>DASHBOARD</span>
-            </p>
+            <p className="dash-breadcrumb">Upload / <span>Dashboard</span></p>
             <h1 className="dash-title">Document Analysis</h1>
             <p className="dash-sub">
-              <span>{isReal ? analysisData.filename : 'Sample_NDA_Agreement.pdf'}</span> &nbsp;·&nbsp; {clauses.length} clauses detected &nbsp;·&nbsp; Analyzed just now
+              {isReal ? analysisData.filename : 'Sample_NDA_Agreement.pdf'} &nbsp;·&nbsp; {clauses.length} clauses &nbsp;·&nbsp; Analyzed just now
             </p>
           </div>
           <div className="dash-actions">
-            <button className="btn-ghost" onClick={() => navigate('/chat')}>💬 Ask AI Assistant</button>
-            <div className="risk-badge">⚠ {summary.highRisk > 0 ? 'High' : summary.mediumRisk > 0 ? 'Medium' : 'Low'} Risk Document</div>
+            <button className="btn-ghost" onClick={() => navigate('/chat')}>Chat with AI</button>
+            <span className={`risk-pill ${riskLevel}`}>
+              {riskLevel === 'high' ? 'High Risk' : riskLevel === 'medium' ? 'Medium Risk' : 'Low Risk'}
+            </span>
           </div>
         </div>
 
-        {/* Summary */}
-        <div style={{ marginBottom: 18 }}>
+        <div style={{ marginBottom: '18px' }}>
           <SummaryPanel summary={summary} />
         </div>
 
-        {/* Main grid */}
         <div className="dash-grid">
           <div>
             <p className="section-label">Risk Heatmap — {clauses.length} Clauses</p>
             <RiskHeatmap clauses={clauses} selectedId={selectedClause?.id} onSelect={setSelectedClause} />
           </div>
           <div>
-            <p className="section-label">{selectedClause ? `Clause Details — ${selectedClause.title}` : 'Clause Details'}</p>
+            <p className="section-label">{selectedClause ? `Clause — ${selectedClause.title}` : 'Clause Details'}</p>
             <ClauseDetails clause={selectedClause} />
           </div>
         </div>

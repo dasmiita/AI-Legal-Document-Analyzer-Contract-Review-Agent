@@ -13,8 +13,26 @@ from dotenv import load_dotenv
 from ingestion import run_pipeline
 from vector_store import seed_templates
 from agent import run_full_analysis, ask_agent
+from groq import Groq
 
 load_dotenv()
+
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+def explain_clause(body: str, clause_type: str, risk: str) -> str:
+    try:
+        prompt = f"""You are a legal assistant. Explain this {clause_type} clause in 2 sentences of plain English for a non-lawyer founder. Focus on what it means for them and why the risk is {risk}.
+
+CLAUSE:
+{body[:600]}"""
+        chat = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2
+        )
+        return chat.choices[0].message.content.strip()
+    except:
+        return ""
 
 app = FastAPI(title="Legal Analyzer API", version="0.4.0")
 
@@ -61,7 +79,8 @@ async def analyze_document(file: UploadFile = File(...)):
                     "body": s["body"],
                     "clause_type": s.get("clause_type"),
                     "risk": s.get("risk"),
-                    "entities": s.get("entities")
+                    "entities": s.get("entities"),
+                    "explanation": explain_clause(s["body"], s.get("clause_type", "contract"), s.get("risk", "low"))
                 }
                 for s in sections
             ]

@@ -1,55 +1,77 @@
-import React, { useState } from 'react';
-
-const riskConfig = {
-  High:   { color: '#ff4d4d', bg: 'rgba(255,77,77,0.08)',   border: 'rgba(255,77,77,0.25)',   left: '#ff4d4d' },
-  Medium: { color: '#f5c518', bg: 'rgba(245,197,24,0.08)',  border: 'rgba(245,197,24,0.25)',  left: '#f5c518' },
-  Low:    { color: '#00e676', bg: 'rgba(0,230,118,0.08)',   border: 'rgba(0,230,118,0.25)',   left: '#00e676' },
-};
+import React from 'react';
 
 export default function ClauseCard({ clause, isSelected, onClick, index }) {
-  const [hovered, setHovered] = useState(false);
-  const { color, bg, border, left } = riskConfig[clause.risk];
+  const risk = clause.risk || 'Low';
 
   return (
-    <div
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        background: isSelected ? '#161616' : hovered ? '#131313' : '#0f0f0f',
-        border: `1px solid ${isSelected ? '#B8FF00' : hovered ? border : '#1e1e1e'}`,
-        borderLeft: `3px solid ${isSelected ? '#B8FF00' : hovered ? left : '#1e1e1e'}`,
-        borderRadius: 12,
-        padding: '14px 16px',
-        cursor: 'pointer',
-        transition: 'all 0.18s ease',
-        transform: hovered && !isSelected ? 'translateX(2px)' : 'none',
-        boxShadow: isSelected ? `0 0 0 1px #B8FF00, 0 4px 20px rgba(184,255,0,0.08)` : hovered ? `0 4px 16px ${border}` : 'none',
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, minWidth: 0 }}>
-          <span style={{
-            width: 22, height: 22, borderRadius: 6, background: '#1a1a1a', border: '1px solid #2a2a2a',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '0.6rem', color: '#555', fontWeight: 700, flexShrink: 0, marginTop: 1,
-          }}>
-            {String(index + 1).padStart(2, '0')}
-          </span>
-          <span style={{ fontSize: '0.83rem', fontWeight: 600, color: isSelected ? '#f2f2f2' : '#ccc', lineHeight: 1.4 }}>
-            {clause.title}
-          </span>
+    <>
+      <style>{`
+        .clause-card {
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          padding: 12px 14px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          position: relative;
+          overflow: hidden;
+        }
+        .clause-card::before {
+          content: '';
+          position: absolute;
+          left: 0; top: 0; bottom: 0;
+          width: 3px;
+          border-radius: 10px 0 0 10px;
+          transition: opacity 0.2s;
+        }
+        .clause-card.risk-high::before  { background: var(--red); }
+        .clause-card.risk-medium::before { background: var(--yellow); }
+        .clause-card.risk-low::before   { background: var(--green); }
+        .clause-card:hover { background: var(--surface2); border-color: var(--border2); }
+        .clause-card.selected {
+          background: var(--surface2);
+          border-color: var(--gold-border);
+          box-shadow: 0 0 20px var(--gold-glow);
+        }
+        .clause-card.selected::before { background: var(--gold) !important; }
+        .clause-index {
+          width: 20px; height: 20px; border-radius: 4px;
+          background: var(--surface3); border: 1px solid var(--border2);
+          display: flex; align-items: center; justify-content: center;
+          font-family: 'DM Mono', monospace; font-size: 0.58rem;
+          color: var(--text-dim); font-weight: 500; flex-shrink: 0; margin-top: 1px;
+        }
+        .clause-title {
+          font-size: 0.82rem; font-weight: 500; color: var(--text); line-height: 1.4;
+          font-family: 'DM Sans', sans-serif;
+        }
+        .clause-card.selected .clause-title { color: var(--gold); }
+        .risk-tag {
+          font-family: 'DM Mono', monospace;
+          font-size: 0.62rem; font-weight: 500; padding: 2px 8px;
+          border-radius: 4px; white-space: nowrap; flex-shrink: 0;
+          letter-spacing: 0.04em;
+        }
+        .risk-tag.high   { background: var(--red-dim);    color: var(--red);    border: 1px solid var(--red-border); }
+        .risk-tag.medium { background: var(--yellow-dim); color: var(--yellow); border: 1px solid var(--yellow-border); }
+        .risk-tag.low    { background: var(--green-dim);  color: var(--green);  border: 1px solid var(--green-border); }
+        .clause-preview {
+          font-size: 0.71rem; color: var(--text-dim); margin-top: 7px;
+          line-height: 1.5; padding-left: 30px;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+          font-family: 'DM Sans', sans-serif;
+        }
+      `}</style>
+      <div onClick={onClick} className={`clause-card risk-${risk.toLowerCase()} ${isSelected ? 'selected' : ''}`}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', flex: 1, minWidth: 0 }}>
+            <div className="clause-index">{String(index + 1).padStart(2, '0')}</div>
+            <span className="clause-title">{clause.title}</span>
+          </div>
+          <span className={`risk-tag ${risk.toLowerCase()}`}>{risk}</span>
         </div>
-        <span style={{
-          fontSize: '0.65rem', fontWeight: 700, padding: '3px 9px', borderRadius: 20,
-          background: bg, color, border: `1px solid ${border}`, whiteSpace: 'nowrap', flexShrink: 0,
-        }}>
-          {clause.risk}
-        </span>
+        <p className="clause-preview">{clause.text?.slice(0, 80)}...</p>
       </div>
-      <p style={{ fontSize: '0.72rem', color: '#3a3a3a', marginTop: 8, lineHeight: 1.5, paddingLeft: 32 }}>
-        {clause.text.slice(0, 72)}…
-      </p>
-    </div>
+    </>
   );
 }
