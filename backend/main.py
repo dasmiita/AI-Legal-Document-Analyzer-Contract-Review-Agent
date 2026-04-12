@@ -63,11 +63,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_seeded = False
+
 @app.on_event("startup")
 async def startup():
-    print("Seeding gold standard templates into ChromaDB...")
-    seed_templates()
-    print("Templates ready.")
+    print("App started. Templates will seed on first request.")
+
+def ensure_seeded():
+    global _seeded
+    if not _seeded:
+        print("Seeding templates...")
+        seed_templates()
+        _seeded = True
 
 
 @app.get("/")
@@ -76,7 +83,9 @@ def health_check():
 
 
 @app.post("/analyze")
+
 async def analyze_document(file: UploadFile = File(...)):
+    ensure_seeded() 
     """Quick ingestion pipeline — returns segmented sections."""
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files accepted")
