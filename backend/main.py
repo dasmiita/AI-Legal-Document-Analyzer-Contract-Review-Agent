@@ -19,26 +19,46 @@ load_dotenv()
 
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-def explain_clause(body: str, clause_type: str, risk: str) -> str:
+def explain_clauses_batch(sections: list) -> list:
+    """Single LLM call to explain all clauses at once."""
     try:
-        prompt = f"""You are a legal assistant. Explain this {clause_type} clause in 2 sentences of plain English for a non-lawyer founder. Focus on what it means for them and why the risk is {risk}.
+        clauses_text = "\n\n".join([
+            f"CLAUSE {i+1} ({s.get('clause_type','contract')}, {s.get('risk','low')} risk):\n{s['body'][:400]}"
+            for i, s in enumerate(sections)
+        ])
+        prompt = f"""You are a legal assistant. For each clause below, write exactly 2 sentences of plain English explanation for a non-lawyer founder. Focus on what it means for them and the risk level.
 
-CLAUSE:
-{body[:600]}"""
+Respond in this exact format for each clause:
+CLAUSE 1: <explanation>
+CLAUSE 2: <explanation>
+...and so on.
+
+{clauses_text}"""
         chat = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2
         )
-        return chat.choices[0].message.content.strip()
+        raw = chat.choices[0].message.content.strip()
+        explanations = []
+        for i in range(len(sections)):
+            marker = f"CLAUSE {i+1}:"
+            next_marker = f"CLAUSE {i+2}:"
+            start = raw.find(marker)
+            end = raw.find(next_marker) if i+1 < len(sections) else len(raw)
+            if start != -1:
+                explanations.append(raw[start+len(marker):end].strip())
+            else:
+                explanations.append("")
+        return explanations
     except:
-        return ""
+        return ["" for _ in sections]
 
 app = FastAPI(title="Legal Analyzer API", version="0.4.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:3001"],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -68,6 +88,7 @@ async def analyze_document(file: UploadFile = File(...)):
 
     try:
         sections = run_pipeline(tmp_path)
+        explanations = explain_clauses_batch(sections)
         return {
             "filename": file.filename,
             "section_count": len(sections),
@@ -80,9 +101,9 @@ async def analyze_document(file: UploadFile = File(...)):
                     "clause_type": s.get("clause_type"),
                     "risk": s.get("risk"),
                     "entities": s.get("entities"),
-                    "explanation": explain_clause(s["body"], s.get("clause_type", "contract"), s.get("risk", "low"))
+                    "explanation": explanations[i]
                 }
-                for s in sections
+                for i, s in enumerate(sections)
             ]
         }
     except Exception as e:
